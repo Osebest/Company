@@ -1,65 +1,47 @@
-import { Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { Role, User } from './entities/user.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service';
+import { UserCreateInput, UserUpdateInput } from 'generated/prisma/models';
+import { Role } from 'generated/prisma/enums';
 
 @Injectable()
 export class UsersService {
-  allUsers: User[] = [
-    {
-      id: 1,
-      name: 'Adam',
-      email: 'adma@GMAIL.COM',
-      role: Role.ADMIN,
-    },
-    {
-      id: 2,
-      name: 'Sarah',
-      email: 'adma@GMAIL.COM',
-      role: Role.USER,
-    },
-    {
-      id: 3,
-      name: 'Bob',
-      email: 'adma@GMAIL.COM',
-      role: Role.INTERN,
-    },
-  ];
-  create(createUserDto: CreateUserDto) {
-    const newUser = {
-      id: this.allUsers.length + 1,
-      ...createUserDto,
-    };
-    this.allUsers.push(newUser);
-    return newUser;
+  constructor(private readonly db: DatabaseService) {}
+
+  async create(createUserDto: UserCreateInput) {
+    return this.db.user.create({ data: createUserDto });
   }
 
-  findAll(role?: Role): User[] {
+  async findAll(role?: Role) {
     if (role) {
-      return this.allUsers.filter((user) => user.role === role);
+      return this.db.user.findMany({ where: { role } });
     }
-    return this.allUsers;
+    return this.db.user.findMany();
   }
 
-  findOne(id: number) {
-    return this.allUsers.find((user) => user.id === id);
+  async findOne(id: string) {
+    const user = await this.db.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+    return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    const userToUpdate = this.findOne(id);
-    if (!userToUpdate) {
-      return 'User not found';
+  async update(id: string, updateUserDto: UserUpdateInput) {
+    try {
+      return await this.db.user.update({
+        where: { id },
+        data: updateUserDto,
+      });
+    } catch (e) {
+      throw new NotFoundException(`User with id ${id} not found`);
     }
-    Object.assign(userToUpdate, updateUserDto);
-    return userToUpdate;
   }
 
-  remove(id: number) {
-    const userToRemove = this.findOne(id);
-    if (!userToRemove) {
-      return 'User not found';
+  async remove(id: string) {
+    try {
+      return await this.db.user.delete({ where: { id } });
+    } catch (e) {
+      throw new NotFoundException(`User with id ${id} not found`);
     }
-    this.allUsers = this.allUsers.filter((user) => user.id !== id);
-    return userToRemove;
   }
 }
